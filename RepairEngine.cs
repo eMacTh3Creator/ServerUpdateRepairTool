@@ -431,6 +431,201 @@ internal sealed class RepairEngine
             """, TimeSpan.FromMinutes(20)), log, progress, cancellationToken);
     }
 
+    public async Task CreateBootDriverPackAsync(LogSession log, IProgress<string> progress, CancellationToken cancellationToken)
+    {
+        log.WriteSection("Boot driver pack");
+        await _runner.RunAsync(PowerShell("Create boot storage driver recovery pack", $$"""
+            $ErrorActionPreference = 'Continue'
+            $packRoot = Join-Path '{{EscapePowerShellLiteral(log.RootPath)}}' 'BootDriverPack'
+            $driverRoot = Join-Path $packRoot 'Drivers'
+            $registryRoot = Join-Path $packRoot 'Registry'
+            $fileRoot = Join-Path $packRoot 'DriverFiles'
+            New-Item -ItemType Directory -Force -Path $driverRoot,$registryRoot,$fileRoot | Out-Null
+
+            function Copy-SafeItem {
+              param([string] $Source, [string] $Destination)
+              try {
+                if (Test-Path -LiteralPath $Source) {
+                  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Destination) | Out-Null
+                  Copy-Item -LiteralPath $Source -Destination $Destination -Recurse -Force
+                  Write-Host "Copied: $Source"
+                }
+              } catch {
+                Write-Host "Copy failed for $Source : $($_.Exception.Message)"
+              }
+            }
+
+            function Get-RegDword {
+              param([string] $Path, [string] $Name)
+              try {
+                $item = Get-ItemProperty -LiteralPath $Path -Name $Name -ErrorAction Stop
+                return [int]$item.$Name
+              } catch {
+                return $null
+              }
+            }
+
+            function Export-ServiceKey {
+              param([string] $ServiceName)
+              $servicePath = "HKLM:\SYSTEM\CurrentControlSet\Services\$ServiceName"
+              if (-not (Test-Path -LiteralPath $servicePath)) {
+                return
+              }
+
+              $target = Join-Path $registryRoot "$ServiceName.reg"
+              & reg.exe export "HKLM\SYSTEM\CurrentControlSet\Services\$ServiceName" "$target" /y | Out-Host
+
+              $props = Get-ItemProperty -LiteralPath $servicePath
+              $imagePath = $props.ImagePath
+              if ($imagePath) {
+                $relative = ($imagePath -replace '^\\SystemRoot\\', '' -replace '^system32\\', 'System32\')
+                $source = Join-Path $env:windir $relative
+                Copy-SafeItem $source (Join-Path $fileRoot (Split-Path -Leaf $source))
+              }
+            }
+
+            function Copy-InfPackage {
+              param([string] $InfName)
+              if ([string]::IsNullOrWhiteSpace($InfName)) {
+                return
+              }
+
+              $safeInf = ($InfName -replace '[\\/:*?"<>|]', '_')
+              $dest = Join-Path $driverRoot $safeInf
+              New-Item -ItemType Directory -Force -Path $dest | Out-Null
+
+              $infPath = Join-Path $env:windir "INF\$InfName"
+              Copy-SafeItem $infPath (Join-Path $dest $InfName)
+
+              if ($InfName -match '^oem\d+\.inf$') {
+                Write-Host "Exporting third-party driver package $InfName with pnputil"
+                & pnputil.exe /export-driver $InfName $dest | Out-Host
+              }
+
+              $base = [IO.Path]::GetFileNameWithoutExtension($InfName)
+              $storeMatches = @(Get-ChildItem -LiteralPath (Join-Path $env:windir 'System32\DriverStore\FileRepository') -Directory -Filter "$base.inf_*" -ErrorAction SilentlyContinue)
+              foreach ($match in $storeMatches) {
+                Copy-SafeItem $match.FullName (Join-Path $dest $match.Name)
+              }
+            }
+
+            Write-Host 'Detecting storage controller drivers...'
+            $controllers = @(Get-CimInstance Win32_PnPSignedDriver -ErrorAction SilentlyContinue |
+              Where-Object { $_.DeviceClass -match 'SCSIAdapter|HDC' -or $_.DeviceName -match 'LSI|SAS|PVSCSI|VMware|RAID|SATA|NVMe|Fusion|MegaRAID' } |
+              Sort-Object DeviceClass,DeviceName)
+
+            $controllers |
+              Select-Object DeviceName,DeviceClass,DriverProviderName,DriverVersion,DriverDate,InfName,DeviceID |
+              Export-Csv -NoTypeInformation -Path (Join-Path $packRoot 'DetectedStorageDrivers.csv')
+
+            $serviceMap = [ordered]@{
+              'LSI_SAS' = 'LSI Logic SAS / inbox Windows driver'
+              'pvscsi' = 'VMware Paravirtual SCSI'
+              'vmscsi' = 'VMware legacy SCSI'
+              'storahci' = 'Microsoft AHCI'
+              'stornvme' = 'Microsoft NVMe'
+              'megasas' = 'MegaRAID SAS'
+            }
+
+            $recommended = New-Object System.Collections.Generic.List[string]
+            $detectedInfNames = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::OrdinalIgnoreCase)
+
+            foreach ($controller in $controllers) {
+              Write-Host "Detected: $($controller.DeviceName) | Provider=$($controller.DriverProviderName) | INF=$($controller.InfName)"
+              if ($controller.InfName) {
+                $detectedInfNames.Add($controller.InfName) | Out-Null
+              }
+
+              if ($controller.DeviceName -match 'LSI|Fusion|SAS' -or $controller.InfName -match 'lsi') {
+                $recommended.Add('LSI_SAS') | Out-Null
+              }
+              if ($controller.DeviceName -match 'PVSCSI|Paravirtual' -or $controller.InfName -match 'pvscsi') {
+                $recommended.Add('pvscsi') | Out-Null
+              }
+            }
+
+            if ($recommended.Count -eq 0) {
+              $recommended.Add('LSI_SAS') | Out-Null
+              Write-Host 'No specific VMware boot controller was obvious. Including LSI_SAS because this VM is expected to use LSI Logic SAS.'
+            }
+
+            foreach ($infName in $detectedInfNames) {
+              Copy-InfPackage $infName
+            }
+
+            foreach ($serviceName in $serviceMap.Keys) {
+              Export-ServiceKey $serviceName
+            }
+
+            foreach ($infName in @('lsi_sas.inf','pvscsi.inf','vmscsi.inf','megasas.inf','storahci.inf','stornvme.inf')) {
+              Copy-InfPackage $infName
+            }
+
+            Write-Host 'Exporting all third-party drivers with DISM as a fallback...'
+            $thirdPartyRoot = Join-Path $driverRoot 'AllThirdPartyDrivers'
+            New-Item -ItemType Directory -Force -Path $thirdPartyRoot | Out-Null
+            & dism.exe /Online /Export-Driver /Destination:"$thirdPartyRoot" | Out-Host
+
+            $summaryPath = Join-Path $packRoot 'BootDriverPack.summary.txt'
+            $commandsPath = Join-Path $packRoot 'RecoveryCommands.txt'
+            $recommendedUnique = @($recommended | Select-Object -Unique)
+
+            $summary = @()
+            $summary += 'Server Update Repair Tool - Boot Driver Pack'
+            $summary += "Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+            $summary += "Computer: $env:COMPUTERNAME"
+            $summary += ''
+            $summary += 'Detected storage controller drivers:'
+            if ($controllers.Count -eq 0) {
+              $summary += '  No storage controllers were returned by CIM.'
+            } else {
+              foreach ($controller in $controllers) {
+                $summary += "  $($controller.DeviceName) | Provider=$($controller.DriverProviderName) | Version=$($controller.DriverVersion) | INF=$($controller.InfName)"
+              }
+            }
+            $summary += ''
+            $summary += 'Recommended boot service(s):'
+            foreach ($serviceName in $recommendedUnique) {
+              $servicePath = "HKLM:\SYSTEM\CurrentControlSet\Services\$serviceName"
+              $start = Get-RegDword $servicePath 'Start'
+              $override = Test-Path -LiteralPath (Join-Path $servicePath 'StartOverride')
+              $summary += "  $serviceName | Start=$start | StartOverridePresent=$override | $($serviceMap[$serviceName])"
+            }
+            $summary += ''
+            $summary += "Driver package folder: $driverRoot"
+            $summary += "Registry export folder: $registryRoot"
+            $summary += ''
+            $summary += 'Important: for LSI Logic SAS, Windows normally uses the inbox LSI_SAS driver. This pack copies the active DriverStore package when it can be found and also includes registry evidence.'
+            $summary | Set-Content -LiteralPath $summaryPath -Encoding UTF8
+
+            $commands = @()
+            $commands += 'Server Update Repair Tool - Offline Recovery Commands'
+            $commands += ''
+            $commands += 'Use these from Windows Recovery Environment or a Windows Server install ISO command prompt.'
+            $commands += 'Replace C: with the actual offline Windows volume and X:\BootDriverPack with the location of this folder.'
+            $commands += ''
+            $commands += '1. Add collected drivers to the offline Windows image:'
+            $commands += '   dism /Image:C:\ /Add-Driver /Driver:X:\BootDriverPack\Drivers /Recurse'
+            $commands += ''
+            $commands += '2. If this failure happened immediately after Windows Update, consider reverting pending actions first:'
+            $commands += '   dism /Image:C:\ /Cleanup-Image /RevertPendingActions'
+            $commands += ''
+            $commands += '3. Verify or force the boot storage service start type only when it matches the VM boot controller:'
+            $commands += '   reg load HKLM\OfflineSYSTEM C:\Windows\System32\Config\SYSTEM'
+            foreach ($serviceName in $recommendedUnique) {
+              $commands += "   reg add HKLM\OfflineSYSTEM\ControlSet001\Services\$serviceName /v Start /t REG_DWORD /d 0 /f"
+            }
+            $commands += '   reg unload HKLM\OfflineSYSTEM'
+            $commands += ''
+            $commands += '4. Review the exported .reg files before deleting any StartOverride key. Do not change storage services that are not used by the boot disk.'
+            $commands | Set-Content -LiteralPath $commandsPath -Encoding UTF8
+
+            Write-Host "BOOT DRIVER PACK: $packRoot"
+            Write-Host "Recommended boot service(s): $($recommendedUnique -join ', ')"
+            Write-Host "Recovery commands: $commandsPath"
+            """, TimeSpan.FromMinutes(20)), log, progress, cancellationToken);
+    }
+
     private async Task RunManyAsync(IEnumerable<CommandSpec> commands, LogSession log, IProgress<string> progress, CancellationToken cancellationToken)
     {
         foreach (var command in commands)

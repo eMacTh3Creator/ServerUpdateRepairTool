@@ -35,6 +35,16 @@ The `Boot Risk Check` button is read-only. It checks:
 - Update/device-install services that are disabled
 - Recent disk, boot, bugcheck, and service-control events
 
+The `Boot Driver Pack` button creates a recovery bundle for boot-storage driver problems. It:
+
+- Detects storage controller drivers currently visible to Windows
+- Exports third-party storage drivers with `pnputil` and DISM where possible
+- Copies matching inbox DriverStore packages such as `lsi_sas.inf` when present
+- Exports boot-storage service registry keys such as `LSI_SAS` and `pvscsi`
+- Writes `RecoveryCommands.txt` with offline DISM and registry commands for WinRE
+
+For VMware VMs using LSI Logic SAS, the expected boot service is usually `LSI_SAS`, which is a Windows inbox driver. The pack is meant to be copied to recovery media before applying updates.
+
 The recommended repair flow can:
 
 - Reset Windows Update services and rebuild `SoftwareDistribution` / `catroot2`
@@ -86,12 +96,13 @@ dotnet publish WinUpdateRepairTool.csproj -c Release -r win-x64 --self-contained
 2. Copy `ServerUpdateRepairTool.exe` to the affected Windows Server VM.
 3. Run the executable as Administrator.
 4. Run `Boot Risk Check` before applying updates.
-5. Start with `Full Diagnostic`.
-6. Run `Boot/Crash Logs` if the system has shown `INACCESSIBLE_BOOT_DEVICE`, boot device not found, or similar boot failures.
-7. Run `Recommended Repair` only after reviewing any Boot Risk Check failures.
-8. Reboot.
-9. Try Windows Update or the in-place upgrade again.
-10. Use `Zip Bundle` and review or share the collected logs if it still fails.
+5. Run `Boot Driver Pack` and keep the generated folder available before patching servers with recurring boot-device failures.
+6. Start with `Full Diagnostic`.
+7. Run `Boot/Crash Logs` if the system has shown `INACCESSIBLE_BOOT_DEVICE`, boot device not found, or similar boot failures.
+8. Run `Recommended Repair` only after reviewing any Boot Risk Check failures.
+9. Reboot.
+10. Try Windows Update or the in-place upgrade again.
+11. Use `Zip Bundle` and review or share the collected logs if it still fails.
 
 ## DISM Repair Source
 
@@ -127,6 +138,12 @@ Pre-update boot risk output is written to:
 
 ```text
 BootRiskCheck.report.txt
+```
+
+Boot driver recovery output is written to:
+
+```text
+BootDriverPack\
 ```
 
 The UI can open the log folder or create a zip bundle.

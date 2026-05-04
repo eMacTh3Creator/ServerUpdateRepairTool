@@ -8,6 +8,7 @@ partial class Form1
     private Button diagnosticButton = null!;
     private Button repairButton = null!;
     private Button bootRiskButton = null!;
+    private Button bootDriverButton = null!;
     private Button resetWuButton = null!;
     private Button bootCrashButton = null!;
     private Button cancelButton = null!;
@@ -44,6 +45,7 @@ partial class Form1
         diagnosticButton = new Button();
         repairButton = new Button();
         bootRiskButton = new Button();
+        bootDriverButton = new Button();
         resetWuButton = new Button();
         bootCrashButton = new Button();
         cancelButton = new Button();
@@ -131,6 +133,7 @@ partial class Form1
 
         ConfigureButton(diagnosticButton, "Full Diagnostic", DiagnosticButton_Click, 126);
         ConfigureButton(bootRiskButton, "Boot Risk Check", BootRiskButton_Click, 132);
+        ConfigureButton(bootDriverButton, "Boot Driver Pack", BootDriverButton_Click, 136);
         ConfigureButton(repairButton, "Recommended Repair", RepairButton_Click, 152);
         ConfigureButton(resetWuButton, "Reset Update Cache", ResetWuButton_Click, 146);
         ConfigureButton(bootCrashButton, "Boot/Crash Logs", BootCrashButton_Click, 126);
@@ -141,6 +144,7 @@ partial class Form1
         {
             diagnosticButton,
             bootRiskButton,
+            bootDriverButton,
             repairButton,
             resetWuButton,
             bootCrashButton,

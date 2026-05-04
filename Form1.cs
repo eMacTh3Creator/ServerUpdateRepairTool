@@ -29,6 +29,11 @@ public partial class Form1 : Form
         await RunOperationAsync("Boot risk check", (log, progress, token) => _engine.RunBootRiskCheckAsync(log, progress, token));
     }
 
+    private async void BootDriverButton_Click(object? sender, EventArgs e)
+    {
+        await RunOperationAsync("Boot driver pack", (log, progress, token) => _engine.CreateBootDriverPackAsync(log, progress, token));
+    }
+
     private async void RepairButton_Click(object? sender, EventArgs e)
     {
         var answer = MessageBox.Show(
@@ -183,6 +188,11 @@ public partial class Form1 : Form
         {
             ApplyBootRiskSummary(message);
         }
+        else if (message.StartsWith("BOOT DRIVER PACK:", StringComparison.OrdinalIgnoreCase))
+        {
+            statusLabel.ForeColor = Color.FromArgb(21, 128, 61);
+            statusLabel.Text = "Boot Driver Pack created. Open Logs and copy the BootDriverPack folder to recovery media.";
+        }
     }
 
     private void FlushPendingOutput()
@@ -224,6 +234,7 @@ public partial class Form1 : Form
         statusLabel.ForeColor = SystemColors.ControlText;
         diagnosticButton.Enabled = false;
         bootRiskButton.Enabled = false;
+        bootDriverButton.Enabled = false;
         repairButton.Enabled = false;
         resetWuButton.Enabled = false;
         bootCrashButton.Enabled = false;
@@ -240,6 +251,7 @@ public partial class Form1 : Form
         progressBar.Value = 0;
         diagnosticButton.Enabled = true;
         bootRiskButton.Enabled = true;
+        bootDriverButton.Enabled = true;
         repairButton.Enabled = true;
         resetWuButton.Enabled = true;
         bootCrashButton.Enabled = true;
