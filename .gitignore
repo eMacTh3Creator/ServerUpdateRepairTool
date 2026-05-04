@@ -1,0 +1,25 @@
+# Build output
+bin/
+obj/
+publish/
+single/
+artifacts/
+
+# User/machine files
+.vs/
+*.user
+*.suo
+*.rsuser
+
+# Logs and diagnostics
+*.log
+*.dmp
+*.etl
+*.evtx
+*.zip
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

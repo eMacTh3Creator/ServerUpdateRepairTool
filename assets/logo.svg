@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Server Update Repair Tool logo</title>
+  <desc id="desc">A server rack inside a protective shield with update and repair accents.</desc>
+  <defs>
+    <linearGradient id="shield" x1="92" x2="420" y1="48" y2="464" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0e7490"/>
+      <stop offset="0.55" stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#312e81"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="156" x2="356" y1="140" y2="364" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#dbeafe"/>
+    </linearGradient>
+  </defs>
+  <path fill="#0f172a" fill-opacity="0.14" d="M256 493c-61-21-111-54-150-100C66 345 46 288 46 222V90l210-74 210 74v132c0 66-20 123-60 171-39 46-89 79-150 100Z"/>
+  <path fill="url(#shield)" d="M256 472c-56-20-102-51-137-93-36-43-54-95-54-157V104l191-67 191 67v118c0 62-18 114-54 157-35 42-81 73-137 93Z"/>
+  <path fill="#ffffff" fill-opacity="0.15" d="M256 63 91 121v101c0 58 17 106 50 146 29 35 68 62 115 81V63Z"/>
+  <rect x="148" y="148" width="216" height="196" rx="22" fill="url(#panel)"/>
+  <rect x="176" y="180" width="160" height="34" rx="8" fill="#0f172a"/>
+  <rect x="176" y="238" width="160" height="34" rx="8" fill="#1e3a8a"/>
+  <rect x="176" y="296" width="160" height="34" rx="8" fill="#0f766e"/>
+  <circle cx="201" cy="197" r="7" fill="#22c55e"/>
+  <circle cx="201" cy="255" r="7" fill="#f59e0b"/>
+  <circle cx="201" cy="313" r="7" fill="#22c55e"/>
+  <path fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round" stroke-width="22" d="m220 376 36 36 79-91"/>
+  <path fill="none" stroke="#67e8f9" stroke-linecap="round" stroke-width="18" d="M356 121c28 17 47 47 47 82"/>
+  <path fill="#67e8f9" d="m388 120 45 3-24 38Z"/>
+</svg>
