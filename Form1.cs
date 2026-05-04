@@ -19,6 +19,11 @@ public partial class Form1 : Form
         await RunOperationAsync("Full diagnostic", (log, progress, token) => _engine.RunDiagnosticsAsync(log, progress, token));
     }
 
+    private async void BootRiskButton_Click(object? sender, EventArgs e)
+    {
+        await RunOperationAsync("Boot risk check", (log, progress, token) => _engine.RunBootRiskCheckAsync(log, progress, token));
+    }
+
     private async void RepairButton_Click(object? sender, EventArgs e)
     {
         var answer = MessageBox.Show(
@@ -119,7 +124,10 @@ public partial class Form1 : Form
         {
             await operation(_session, progress, _operationCts.Token);
             AppendOutput($"{name} completed.");
-            statusLabel.Text = "Finished. Review transcript.log and exported logs before attempting another update.";
+            if (!name.Equals("Boot risk check", StringComparison.OrdinalIgnoreCase))
+            {
+                statusLabel.Text = "Finished. Review transcript.log and exported logs before attempting another update.";
+            }
         }
         catch (OperationCanceledException)
         {
@@ -161,13 +169,20 @@ public partial class Form1 : Form
         }
 
         outputTextBox.AppendText($"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}");
+
+        if (message.StartsWith("BOOT RISK SUMMARY:", StringComparison.OrdinalIgnoreCase))
+        {
+            ApplyBootRiskSummary(message);
+        }
     }
 
     private void SetBusyState(string name)
     {
         statusLabel.Text = "Running: " + name;
         progressBar.Style = ProgressBarStyle.Marquee;
+        statusLabel.ForeColor = SystemColors.ControlText;
         diagnosticButton.Enabled = false;
+        bootRiskButton.Enabled = false;
         repairButton.Enabled = false;
         resetWuButton.Enabled = false;
         bootCrashButton.Enabled = false;
@@ -183,6 +198,7 @@ public partial class Form1 : Form
         progressBar.Style = ProgressBarStyle.Blocks;
         progressBar.Value = 0;
         diagnosticButton.Enabled = true;
+        bootRiskButton.Enabled = true;
         repairButton.Enabled = true;
         resetWuButton.Enabled = true;
         bootCrashButton.Enabled = true;
@@ -191,6 +207,47 @@ public partial class Form1 : Form
         cancelButton.Enabled = false;
         openLogButton.Enabled = _session is not null;
         zipButton.Enabled = _session is not null;
+    }
+
+    private void ApplyBootRiskSummary(string summary)
+    {
+        var failCount = ExtractSummaryCount(summary, "FAIL");
+        var warnCount = ExtractSummaryCount(summary, "WARN");
+
+        if (failCount > 0)
+        {
+            statusLabel.ForeColor = Color.FromArgb(185, 28, 28);
+            statusLabel.Text = "Boot Risk Check found critical issues. Review BootRiskCheck.report.txt before updating or rebooting.";
+        }
+        else if (warnCount > 0)
+        {
+            statusLabel.ForeColor = Color.FromArgb(180, 83, 9);
+            statusLabel.Text = "Boot Risk Check found warnings. Review the report before applying updates.";
+        }
+        else
+        {
+            statusLabel.ForeColor = Color.FromArgb(21, 128, 61);
+            statusLabel.Text = "Boot Risk Check passed without critical findings.";
+        }
+    }
+
+    private static int ExtractSummaryCount(string summary, string name)
+    {
+        var marker = name + "=";
+        var index = summary.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (index < 0)
+        {
+            return 0;
+        }
+
+        index += marker.Length;
+        var end = index;
+        while (end < summary.Length && char.IsDigit(summary[end]))
+        {
+            end++;
+        }
+
+        return int.TryParse(summary[index..end], out var value) ? value : 0;
     }
 
     private void LogoPanel_Paint(object? sender, PaintEventArgs e)

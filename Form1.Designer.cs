@@ -7,6 +7,7 @@ partial class Form1
     private FlowLayoutPanel buttonPanel = null!;
     private Button diagnosticButton = null!;
     private Button repairButton = null!;
+    private Button bootRiskButton = null!;
     private Button resetWuButton = null!;
     private Button bootCrashButton = null!;
     private Button cancelButton = null!;
@@ -42,6 +43,7 @@ partial class Form1
         buttonPanel = new FlowLayoutPanel();
         diagnosticButton = new Button();
         repairButton = new Button();
+        bootRiskButton = new Button();
         resetWuButton = new Button();
         bootCrashButton = new Button();
         cancelButton = new Button();
@@ -128,6 +130,7 @@ partial class Form1
         buttonPanel.WrapContents = true;
 
         ConfigureButton(diagnosticButton, "Full Diagnostic", DiagnosticButton_Click, 126);
+        ConfigureButton(bootRiskButton, "Boot Risk Check", BootRiskButton_Click, 132);
         ConfigureButton(repairButton, "Recommended Repair", RepairButton_Click, 152);
         ConfigureButton(resetWuButton, "Reset Update Cache", ResetWuButton_Click, 146);
         ConfigureButton(bootCrashButton, "Boot/Crash Logs", BootCrashButton_Click, 126);
@@ -137,6 +140,7 @@ partial class Form1
         buttonPanel.Controls.AddRange(new Control[]
         {
             diagnosticButton,
+            bootRiskButton,
             repairButton,
             resetWuButton,
             bootCrashButton,

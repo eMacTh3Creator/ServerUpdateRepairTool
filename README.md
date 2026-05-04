@@ -11,6 +11,7 @@ It was built for the kind of server that refuses cumulative updates, rolls back 
 ## What It Collects
 
 - Full transcript for every command the tool runs
+- Boot Risk Check report for pre-update storage/boot readiness
 - CBS and DISM servicing logs
 - Windows Update logs, including generated `WindowsUpdate.log` where supported
 - Panther setup and rollback logs
@@ -20,6 +21,19 @@ It was built for the kind of server that refuses cumulative updates, rolls back 
 - Minidumps and memory dump copy attempts with size limits
 
 ## Repair Actions
+
+The `Boot Risk Check` button is read-only. It checks:
+
+- LSI Logic SAS, VMware PVSCSI, VMware legacy SCSI, AHCI, NVMe, and MegaRAID boot-driver registry state
+- `StartOverride` values that can stop a boot-critical driver from loading
+- Storage class `UpperFilters` and `LowerFilters` references
+- Pending reboot, pending CBS package, and `pending.xml` markers
+- DISM package states such as `Install Pending` or `Uninstall Pending`
+- BCD entries with unknown device/path values
+- System volume and EFI/System partition free space
+- WinRE and BitLocker state
+- Update/device-install services that are disabled
+- Recent disk, boot, bugcheck, and service-control events
 
 The recommended repair flow can:
 
@@ -71,12 +85,13 @@ dotnet publish WinUpdateRepairTool.csproj -c Release -r win-x64 --self-contained
 1. Take a VMware snapshot or verified backup.
 2. Copy `ServerUpdateRepairTool.exe` to the affected Windows Server VM.
 3. Run the executable as Administrator.
-4. Start with `Full Diagnostic`.
-5. Run `Boot/Crash Logs` if the system has shown `INACCESSIBLE_BOOT_DEVICE`, boot device not found, or similar boot failures.
-6. Run `Recommended Repair`.
-7. Reboot.
-8. Try Windows Update or the in-place upgrade again.
-9. Use `Zip Bundle` and review or share the collected logs if it still fails.
+4. Run `Boot Risk Check` before applying updates.
+5. Start with `Full Diagnostic`.
+6. Run `Boot/Crash Logs` if the system has shown `INACCESSIBLE_BOOT_DEVICE`, boot device not found, or similar boot failures.
+7. Run `Recommended Repair` only after reviewing any Boot Risk Check failures.
+8. Reboot.
+9. Try Windows Update or the in-place upgrade again.
+10. Use `Zip Bundle` and review or share the collected logs if it still fails.
 
 ## DISM Repair Source
 
@@ -106,6 +121,12 @@ The main file is:
 
 ```text
 transcript.log
+```
+
+Pre-update boot risk output is written to:
+
+```text
+BootRiskCheck.report.txt
 ```
 
 The UI can open the log folder or create a zip bundle.
