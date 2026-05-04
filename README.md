@@ -32,9 +32,23 @@ The recommended repair flow can:
 
 The tool does not automatically rewrite BCD, change VMware virtual storage controller drivers, or force offline boot repair. Those operations can break a VM if the virtual hardware and Windows storage stack do not agree.
 
-## Download / Build
+## Download
 
-Build on Windows with .NET 8 SDK or newer:
+Most users should download the prebuilt package instead of building from source:
+
+[Download the latest release](https://github.com/eMacTh3Creator/ServerUpdateRepairTool/releases/latest)
+
+Use the `ServerUpdateRepairTool-v*-win-x64.zip` asset, extract it, and run `ServerUpdateRepairTool.exe` as Administrator on the affected server.
+
+The release also includes a `.sha256` checksum file. To verify it on Windows:
+
+```powershell
+Get-FileHash .\ServerUpdateRepairTool-v0.1.0-win-x64.zip -Algorithm SHA256
+```
+
+## Build From Source
+
+Developers can build on Windows with .NET 8 SDK or newer:
 
 ```powershell
 .\scripts\build.ps1
@@ -113,4 +127,3 @@ Those issues are intentionally logged rather than modified automatically.
 
 - [Microsoft SetupDiag documentation](https://learn.microsoft.com/en-us/windows/deployment/upgrade/setupdiag)
 - [Microsoft DISM operating system package servicing command-line options](https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/dism-operating-system-package-servicing-command-line-options)
-
