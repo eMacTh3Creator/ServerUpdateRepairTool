@@ -1,16 +1,21 @@
 using System.Drawing.Drawing2D;
+using System.Text;
 
 namespace WinUpdateRepairTool;
 
 public partial class Form1 : Form
 {
+    private const int MaxVisibleLogCharacters = 250_000;
     private readonly RepairEngine _engine = new();
+    private readonly Queue<string> _pendingOutput = new();
+    private readonly System.Windows.Forms.Timer _outputFlushTimer = new() { Interval = 150 };
     private CancellationTokenSource? _operationCts;
     private LogSession? _session;
 
     public Form1()
     {
         InitializeComponent();
+        _outputFlushTimer.Tick += (_, _) => FlushPendingOutput();
         SetIdleState();
     }
 
@@ -168,12 +173,48 @@ public partial class Form1 : Form
             return;
         }
 
-        outputTextBox.AppendText($"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}");
+        _pendingOutput.Enqueue($"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}");
+        if (!_outputFlushTimer.Enabled)
+        {
+            _outputFlushTimer.Start();
+        }
 
         if (message.StartsWith("BOOT RISK SUMMARY:", StringComparison.OrdinalIgnoreCase))
         {
             ApplyBootRiskSummary(message);
         }
+    }
+
+    private void FlushPendingOutput()
+    {
+        if (_pendingOutput.Count == 0)
+        {
+            _outputFlushTimer.Stop();
+            return;
+        }
+
+        var builder = new StringBuilder();
+        while (_pendingOutput.Count > 0 && builder.Length < 32_000)
+        {
+            builder.Append(_pendingOutput.Dequeue());
+        }
+
+        outputTextBox.AppendText(builder.ToString());
+        TrimVisibleLogIfNeeded();
+    }
+
+    private void TrimVisibleLogIfNeeded()
+    {
+        if (outputTextBox.TextLength <= MaxVisibleLogCharacters)
+        {
+            return;
+        }
+
+        var removeLength = outputTextBox.TextLength - (MaxVisibleLogCharacters / 2);
+        outputTextBox.Select(0, removeLength);
+        outputTextBox.SelectedText = "[Older UI output trimmed. Full output remains in transcript.log.]\r\n";
+        outputTextBox.SelectionStart = outputTextBox.TextLength;
+        outputTextBox.ScrollToCaret();
     }
 
     private void SetBusyState(string name)

@@ -101,10 +101,12 @@ internal sealed class CommandRunner
         IProgress<string> progress,
         CancellationToken cancellationToken)
     {
-        while (!reader.EndOfStream)
+        var lastUiReport = DateTimeOffset.MinValue;
+        var suppressedLines = 0;
+
+        while (true)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var line = await reader.ReadLineAsync(cancellationToken);
+            var line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
             if (line is null)
             {
                 break;
@@ -113,9 +115,40 @@ internal sealed class CommandRunner
             log.WriteLine(line);
             if (!string.IsNullOrWhiteSpace(line))
             {
-                progress.Report(line);
+                if (ShouldReportToUi(line, lastUiReport))
+                {
+                    if (suppressedLines > 0)
+                    {
+                        progress.Report($"... {suppressedLines:n0} additional lines written to transcript.log");
+                        suppressedLines = 0;
+                    }
+
+                    progress.Report(line);
+                    lastUiReport = DateTimeOffset.Now;
+                }
+                else
+                {
+                    suppressedLines++;
+                }
             }
         }
+
+        if (suppressedLines > 0)
+        {
+            progress.Report($"... {suppressedLines:n0} additional lines written to transcript.log");
+        }
+    }
+
+    private static bool ShouldReportToUi(string line, DateTimeOffset lastUiReport)
+    {
+        if (line.StartsWith("BOOT RISK SUMMARY:", StringComparison.OrdinalIgnoreCase) ||
+            line.StartsWith("[FAIL]", StringComparison.OrdinalIgnoreCase) ||
+            line.StartsWith("[WARN]", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return DateTimeOffset.Now - lastUiReport > TimeSpan.FromMilliseconds(300);
     }
 
     private static async Task SafeAwait(Task task)
