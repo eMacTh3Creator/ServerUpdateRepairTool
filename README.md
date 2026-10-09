@@ -6,7 +6,7 @@
 
 Server Update Repair Tool is a Windows desktop utility for diagnosing and repairing Windows Update, servicing, and in-place upgrade failures on Windows Server systems.
 
-It was built for the kind of server that refuses cumulative updates, rolls back feature/version upgrades, or crashes around boot after a failed upgrade attempt. The tool favors conservative Windows-supported repair actions and aggressive evidence collection, so every step leaves a clear log trail.
+Use it to collect logs after a failed update or upgrade, check boot and storage settings, and run Windows repair tools. Each command is recorded in a transcript for review.
 
 ## What It Collects
 
